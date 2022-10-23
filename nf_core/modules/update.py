@@ -57,8 +57,8 @@ class ModuleUpdate(ModuleCommand):
         if self.update_all and self.module:
             raise UserWarning("Either a module or the '--all' flag can be specified, not both.")
 
-        if self.repo_type == "modules":
-            raise UserWarning("Modules in clones of nf-core/modules can not be updated.")
+        # if self.repo_type == "modules":
+        #     raise UserWarning("Modules in clones of nf-core/modules can not be updated.")
 
         if self.prompt and self.sha is not None:
             raise UserWarning("Cannot use '--sha' and '--prompt' at the same time.")
