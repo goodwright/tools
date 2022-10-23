@@ -30,9 +30,9 @@ class ModuleInstall(ModuleCommand):
         self.sha = sha
 
     def install(self, module):
-        if self.repo_type == "modules":
-            log.error("You cannot install a module in a clone of nf-core/modules")
-            return False
+        # if self.repo_type == "modules":
+        #     log.error("You cannot install a module in a clone of nf-core/modules")
+        #     return False
         # Check whether pipelines is valid
         if not self.has_valid_directory():
             return False

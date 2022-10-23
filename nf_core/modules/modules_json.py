@@ -114,53 +114,53 @@ class ModulesJson:
         dirs_not_covered = self.dir_tree_uncovered(
             modules_dir, [Path(nf_core.modules.module_utils.path_from_remote(url)) for url in repos]
         )
-        if len(dirs_not_covered) > 0:
-            log.info("Found custom module repositories when creating 'modules.json'")
-            # Loop until all directories in the base directory are covered by a remote
-            while len(dirs_not_covered) > 0:
-                log.info(
-                    "The following director{s} in the modules directory are untracked: '{l}'".format(
-                        s="ies" if len(dirs_not_covered) > 0 else "y",
-                        l="', '".join(str(dir.relative_to(modules_dir)) for dir in dirs_not_covered),
-                    )
-                )
-                nrepo_remote = questionary.text(
-                    "Please provide a URL for for one of the repos contained in the untracked directories.",
-                    style=nf_core.utils.nfcore_question_style,
-                ).unsafe_ask()
-                # Verify that the remote exists
-                while True:
-                    try:
-                        git.Git().ls_remote(nrepo_remote)
-                        break
-                    except GitCommandError:
-                        nrepo_remote = questionary.text(
-                            "The provided remote does not seem to exist, please provide a new remote."
-                        ).unsafe_ask()
+        # if len(dirs_not_covered) > 0:
+        #     log.info("Found custom module repositories when creating 'modules.json'")
+        #     # Loop until all directories in the base directory are covered by a remote
+        #     while len(dirs_not_covered) > 0:
+        #         log.info(
+        #             "The following director{s} in the modules directory are untracked: '{l}'".format(
+        #                 s="ies" if len(dirs_not_covered) > 0 else "y",
+        #                 l="', '".join(str(dir.relative_to(modules_dir)) for dir in dirs_not_covered),
+        #             )
+        #         )
+        #         nrepo_remote = questionary.text(
+        #             "Please provide a URL for for one of the repos contained in the untracked directories.",
+        #             style=nf_core.utils.nfcore_question_style,
+        #         ).unsafe_ask()
+        #         # Verify that the remote exists
+        #         while True:
+        #             try:
+        #                 git.Git().ls_remote(nrepo_remote)
+        #                 break
+        #             except GitCommandError:
+        #                 nrepo_remote = questionary.text(
+        #                     "The provided remote does not seem to exist, please provide a new remote."
+        #                 ).unsafe_ask()
 
-                # Verify that there is a directory corresponding the remote
-                nrepo_name = nf_core.modules.module_utils.path_from_remote(nrepo_remote)
-                if not (modules_dir / nrepo_name).exists():
-                    log.info(
-                        "The provided remote does not seem to correspond to a local directory. "
-                        "The directory structure should be the same as in the remote."
-                    )
-                    dir_name = questionary.text(
-                        "Please provide the correct directory, it will be renamed. If left empty, the remote will be ignored.",
-                        style=nf_core.utils.nfcore_question_style,
-                    ).unsafe_ask()
-                    if dir_name:
-                        old_path = modules_dir / dir_name
-                        new_path = modules_dir / nrepo_name
-                        old_path.rename(new_path)
-                        renamed_dirs[old_path] = new_path
-                    else:
-                        continue
+        #         # Verify that there is a directory corresponding the remote
+        #         nrepo_name = nf_core.modules.module_utils.path_from_remote(nrepo_remote)
+        #         if not (modules_dir / nrepo_name).exists():
+        #             log.info(
+        #                 "The provided remote does not seem to correspond to a local directory. "
+        #                 "The directory structure should be the same as in the remote."
+        #             )
+        #             dir_name = questionary.text(
+        #                 "Please provide the correct directory, it will be renamed. If left empty, the remote will be ignored.",
+        #                 style=nf_core.utils.nfcore_question_style,
+        #             ).unsafe_ask()
+        #             if dir_name:
+        #                 old_path = modules_dir / dir_name
+        #                 new_path = modules_dir / nrepo_name
+        #                 old_path.rename(new_path)
+        #                 renamed_dirs[old_path] = new_path
+        #             else:
+        #                 continue
 
-                repos[nrepo_remote]["modules"][nrepo_name] = {}
-                dirs_not_covered = self.dir_tree_uncovered(
-                    modules_dir, [Path(name) for name in repos[url][modules_dir] for url in repos]
-                )
+        #         repos[nrepo_remote]["modules"][nrepo_name] = {}
+        #         dirs_not_covered = self.dir_tree_uncovered(
+        #             modules_dir, [Path(name) for name in repos[url][modules_dir] for url in repos]
+        #         )
         return repos, renamed_dirs
 
     def dir_tree_uncovered(self, modules_dir, repos):
