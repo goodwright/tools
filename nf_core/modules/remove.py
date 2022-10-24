@@ -17,9 +17,9 @@ class ModuleRemove(ModuleCommand):
         Remove an already installed module
         This command only works for modules that are installed from 'nf-core/modules'
         """
-        if self.repo_type == "modules":
-            log.error("You cannot remove a module in a clone of nf-core/modules")
-            return False
+        # if self.repo_type == "modules":
+        #     log.error("You cannot remove a module in a clone of nf-core/modules")
+        #     return False
 
         # Check modules directory structure
         self.check_modules_structure()
