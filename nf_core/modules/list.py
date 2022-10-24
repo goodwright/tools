@@ -61,16 +61,16 @@ class ModuleList(ModuleCommand):
 
         # We have a pipeline - list what's installed
         else:
-            # Check that we are in a pipeline directory
-            try:
-                _, repo_type = nf_core.modules.module_utils.get_repo_type(self.dir)
-                if repo_type != "pipeline":
-                    raise UserWarning(
-                        "The command 'nf-core modules list local' must be run from a pipeline directory.",
-                    )
-            except UserWarning as e:
-                log.error(e)
-                return ""
+            # # Check that we are in a pipeline directory
+            # try:
+            #     _, repo_type = nf_core.modules.module_utils.get_repo_type(self.dir)
+            #     if repo_type != "pipeline":
+            #         raise UserWarning(
+            #             "The command 'nf-core modules list local' must be run from a pipeline directory.",
+            #         )
+            # except UserWarning as e:
+            #     log.error(e)
+            #     return ""
             # Check whether pipelines is valid
             try:
                 self.has_valid_directory()
