@@ -43,9 +43,9 @@ class SubworkflowInstall(object):
             raise UserWarning(e)
 
     def install(self, subworkflow):
-        if self.repo_type == "modules":
-            log.error("You cannot install a subworkflow in a clone of nf-core/modules")
-            return False
+        # if self.repo_type == "modules":
+        #     log.error("You cannot install a subworkflow in a clone of nf-core/modules")
+        #     return False
         # Check whether pipelines is valid
         if not self.has_valid_directory():
             return False
@@ -181,8 +181,8 @@ class SubworkflowInstall(object):
             return False
         main_nf = os.path.join(self.dir, "main.nf")
         nf_config = os.path.join(self.dir, "nextflow.config")
-        if not os.path.exists(main_nf) and not os.path.exists(nf_config):
-            raise UserWarning(f"Could not find a 'main.nf' or 'nextflow.config' file in '{self.dir}'")
+        # if not os.path.exists(main_nf) and not os.path.exists(nf_config):
+        #     raise UserWarning(f"Could not find a 'main.nf' or 'nextflow.config' file in '{self.dir}'")
         return True
 
     def clear_subworkflow_dir(self, subworkflow_name, subworkflow_dir):
