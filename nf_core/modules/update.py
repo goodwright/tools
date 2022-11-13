@@ -106,7 +106,7 @@ class ModuleUpdate(ComponentCommand):
             return False
 
         # Get the list of modules to update, and their version information
-        modules_info = self.get_all_modules_info() if self.update_all else [self.get_single_module_info(module)]
+        modules_info = self.get_all_modules_info(branch=self.branch) if self.update_all else [self.get_single_module_info(module)]
 
         # Save the current state of the modules.json
         old_modules_json = self.modules_json.get_modules_json()
