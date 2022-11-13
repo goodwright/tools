@@ -25,13 +25,14 @@ import yaml
 from rich.syntax import Syntax
 
 import nf_core.utils
+from nf_core.components.components_command import ComponentCommand
 from nf_core.modules.modules_json import ModulesJson
 from nf_core.modules.modules_repo import ModulesRepo
 
 log = logging.getLogger(__name__)
 
 
-class SubworkflowTestYmlBuilder(object):
+class SubworkflowTestYmlBuilder(ComponentCommand):
     def __init__(
         self,
         subworkflow=None,
@@ -41,7 +42,7 @@ class SubworkflowTestYmlBuilder(object):
         force_overwrite=False,
         no_prompts=False,
     ):
-        # super().__init__(directory)
+        super().__init__("subworkflows", directory)
         self.dir = directory
         self.subworkflow = subworkflow
         self.run_tests = run_tests
@@ -76,7 +77,7 @@ class SubworkflowTestYmlBuilder(object):
         if self.subworkflow is None:
             self.subworkflow = questionary.autocomplete(
                 "Subworkflow name:",
-                choices=self.modules_repo.get_avail_subworkflows(),
+                choices=self.modules_repo.get_avail_components(self.component_type),
                 style=nf_core.utils.nfcore_question_style,
             ).unsafe_ask()
         self.subworkflow_dir = os.path.join("subworkflows", self.modules_repo.repo_path, self.subworkflow)
@@ -305,9 +306,9 @@ class SubworkflowTestYmlBuilder(object):
             for i in range(len(test_files)):
                 if test_files[i].get("md5sum") and not test_files[i].get("md5sum") == test_files_repeat[i]["md5sum"]:
                     test_files[i].pop("md5sum")
-                    test_files[i][
-                        "contains"
-                    ] = "[ # TODO nf-core: file md5sum was variable, please replace this text with a string found in the file instead ]"
+                    test_files[i]["contains"] = [
+                        " # TODO nf-core: file md5sum was variable, please replace this text with a string found in the file instead "
+                    ]
 
         if len(test_files) == 0:
             raise UserWarning(f"Could not find any test result files in '{results_dir}'")
