@@ -65,10 +65,10 @@ class ComponentList(ComponentCommand):
 
             try:
                 _, repo_type = nf_core.modules.modules_utils.get_repo_type(self.dir)
-                if repo_type != "pipeline":
-                    raise UserWarning(
-                        f"The command 'nf-core {self.component_type} list local' must be run from a pipeline directory.",
-                    )
+                # if repo_type != "pipeline":
+                #     raise UserWarning(
+                #         f"The command 'nf-core {self.component_type} list local' must be run from a pipeline directory.",
+                #     )
             except UserWarning as e:
                 log.error(e)
                 return ""
