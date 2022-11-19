@@ -135,6 +135,12 @@ class TestModules(unittest.TestCase):
         test_modules_custom_yml_dumper,
         test_modules_test_file_dict,
     )
+    from .modules.info import (
+        test_modules_info_in_modules_repo,
+        test_modules_info_local,
+        test_modules_info_remote,
+        test_modules_info_remote_gitlab,
+    )
     from .modules.install import (
         test_modules_install_different_branch_fail,
         test_modules_install_different_branch_succeed,
@@ -200,6 +206,8 @@ class TestModules(unittest.TestCase):
         test_update_different_branch_mix_modules_branch_test,
         test_update_different_branch_mixed_modules_main,
         test_update_different_branch_single_module,
+        test_update_only_show_differences,
+        test_update_only_show_differences_when_patch,
         test_update_with_config_dont_update,
         test_update_with_config_fix_all,
         test_update_with_config_fixed_version,
