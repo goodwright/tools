@@ -9,7 +9,12 @@ import questionary
 import nf_core.modules.modules_utils
 import nf_core.utils
 from nf_core.components.components_command import ComponentCommand
-from nf_core.components.components_utils import prompt_component_version_sha
+from nf_core.components.components_utils import (
+    get_components_to_install,
+    prompt_component_version_sha,
+)
+from nf_core.components.install import ComponentInstall
+from nf_core.components.remove import ComponentRemove
 from nf_core.modules.modules_differ import ModulesDiffer
 from nf_core.modules.modules_json import ModulesJson
 from nf_core.modules.modules_repo import ModulesRepo
@@ -87,7 +92,7 @@ class ComponentUpdate(ComponentCommand):
         if updated is None:
             updated = []
 
-        tool_config = nf_core.utils.load_tools_config(self.dir)
+        _, tool_config = nf_core.utils.load_tools_config(self.dir)
         self.update_config = tool_config.get("update", {})
 
         self._parameter_checks()
@@ -96,7 +101,8 @@ class ComponentUpdate(ComponentCommand):
         self.check_modules_structure()
 
         # Verify that 'modules.json' is consistent with the installed modules
-        self.modules_json.check_up_to_date()
+        if not silent:
+            self.modules_json.check_up_to_date()
 
         if not self.update_all and component is None:
             choices = [f"All {self.component_type}", f"Named {self.component_type[:-1]}"]
@@ -146,6 +152,9 @@ class ComponentUpdate(ComponentCommand):
         exit_value = True
         all_patches_successful = True
         for modules_repo, component, sha, patch_relpath in components_info:
+            if component is None:
+                # The entry from .nf-core.yml is set to false, skip update of this component
+                continue
             component_fullname = str(Path(self.component_type, modules_repo.repo_path, component))
             # Are we updating the files in place or not?
             dry_run = self.show_diff or self.save_diff_fn
@@ -230,9 +239,7 @@ class ComponentUpdate(ComponentCommand):
                         else:
                             updated.append(component)
                     recursive_update = True
-                    modules_to_update, subworkflows_to_update = self.get_modules_subworkflows_to_update(
-                        component, modules_repo
-                    )
+                    modules_to_update, subworkflows_to_update = self.get_components_to_update(component, modules_repo)
                     if not silent and len(modules_to_update + subworkflows_to_update) > 0:
                         log.warning(
                             f"All modules and subworkflows linked to the updated {self.component_type[:-1]} will be added to the same diff file.\n"
@@ -252,6 +259,7 @@ class ComponentUpdate(ComponentCommand):
                         self.update_linked_components(
                             modules_to_update, subworkflows_to_update, updated, check_diff_exist=False
                         )
+                        self.manage_changes_in_linked_components(component, modules_to_update, subworkflows_to_update)
 
                 elif self.show_diff:
                     ModulesDiffer.print_diff(
@@ -276,12 +284,10 @@ class ComponentUpdate(ComponentCommand):
                 # Clear the component directory and move the installed files there
                 self.move_files_from_tmp_dir(component, install_tmp_dir, modules_repo.repo_path, version)
                 # Update modules.json with newly installed component
-                self.modules_json.update(self.component_type, modules_repo, component, version, self.component_type)
+                self.modules_json.update(self.component_type, modules_repo, component, version, installed_by=None)
                 updated.append(component)
                 recursive_update = True
-                modules_to_update, subworkflows_to_update = self.get_modules_subworkflows_to_update(
-                    component, modules_repo
-                )
+                modules_to_update, subworkflows_to_update = self.get_components_to_update(component, modules_repo)
                 if not silent and not self.update_all and len(modules_to_update + subworkflows_to_update) > 0:
                     log.warning(
                         f"All modules and subworkflows linked to the updated {self.component_type[:-1]} will be {'asked for update' if self.show_diff else 'automatically updated'}.\n"
@@ -299,10 +305,16 @@ class ComponentUpdate(ComponentCommand):
                 if recursive_update and len(modules_to_update + subworkflows_to_update) > 0:
                     # Update linked components
                     self.update_linked_components(modules_to_update, subworkflows_to_update, updated)
+                    self.manage_changes_in_linked_components(component, modules_to_update, subworkflows_to_update)
             else:
                 # Don't save to a file, just iteratively update the variable
                 self.modules_json.update(
-                    self.component_type, modules_repo, component, version, self.component_type, write_file=False
+                    self.component_type,
+                    modules_repo,
+                    component,
+                    version,
+                    installed_by=None,
+                    write_file=False,
                 )
 
         if self.save_diff_fn:
@@ -346,14 +358,17 @@ class ComponentUpdate(ComponentCommand):
         # Check if there are any modules/subworkflows installed from the repo
         repo_url = self.modules_repo.remote_url
         components = self.modules_json.get_all_components(self.component_type).get(repo_url)
-        choices = [component if dir == "nf-core" else f"{dir}/{component}" for dir, component in components]
-        if repo_url not in self.modules_json.get_all_components(self.component_type):
+        if components is None:
             raise LookupError(f"No {self.component_type} installed from '{repo_url}'")
+
+        choices = [
+            component if directory == "nf-core" else f"{directory}/{component}" for directory, component in components
+        ]
 
         if component is None:
             component = questionary.autocomplete(
                 f"{self.component_type[:-1].title()} name:",
-                choices=choices,
+                choices=sorted(choices),
                 style=nf_core.utils.nfcore_question_style,
             ).unsafe_ask()
 
@@ -378,6 +393,19 @@ class ComponentUpdate(ComponentCommand):
 
         sha = self.sha
         config_entry = None
+        if any(
+            [
+                entry.count("/") == 1
+                and (entry.endswith("modules") or entry.endswith("subworkflows"))
+                and not (entry.endswith(".git") or entry.endswith(".git/"))
+                for entry in self.update_config.keys()
+            ]
+        ):
+            raise UserWarning(
+                "Your '.nf-core.yml' file format is outdated. "
+                "The format should be of the form:\n"
+                "update:\n  <repo_url>:\n    <component_install_directory>:\n      <component_name>:"
+            )
         if isinstance(self.update_config.get(self.modules_repo.remote_url, {}), str):
             # If the repo entry is a string, it's the sha to update to
             config_entry = self.update_config.get(self.modules_repo.remote_url, {})
@@ -386,12 +414,13 @@ class ComponentUpdate(ComponentCommand):
             config_entry = self.update_config[self.modules_repo.remote_url][install_dir].get(component)
         if config_entry is not None and config_entry is not True:
             if config_entry is False:
-                raise UserWarning(
-                    f"{self.component_type[:-1].title()}'s update entry in '.nf-core.yml' is set to False"
+                log.warn(
+                    f"{self.component_type[:-1].title()}'s update entry in '.nf-core.yml' for '{component}' is set to False"
                 )
+                return (self.modules_repo, None, None, None)
             if not isinstance(config_entry, str):
                 raise UserWarning(
-                    f"{self.component_type[:-1].title()}'s update entry in '.nf-core.yml' is of wrong type"
+                    f"{self.component_type[:-1].title()}'s update entry in '.nf-core.yml' for '{component}' is of wrong type"
                 )
 
             sha = config_entry
@@ -802,8 +831,13 @@ class ComponentUpdate(ComponentCommand):
 
         return True
 
-    def get_modules_subworkflows_to_update(self, component, modules_repo):
-        """Get all modules and subworkflows linked to the updated component."""
+    def get_components_to_update(self, component, modules_repo):
+        """
+        Get all modules and subworkflows linked to the updated component.
+
+        Returns:
+            (list,list): A tuple of lists with the modules and subworkflows to update
+        """
         mods_json = self.modules_json.get_modules_json()
         modules_to_update = []
         subworkflows_to_update = []
@@ -848,6 +882,34 @@ class ComponentUpdate(ComponentCommand):
             original_component_type, original_update_all = self._change_component_type("modules")
             self.update(m_update, silent=True, updated=updated, check_diff_exist=check_diff_exist)
             self._reset_component_type(original_component_type, original_update_all)
+
+    def manage_changes_in_linked_components(self, component, modules_to_update, subworkflows_to_update):
+        """Check for linked components added or removed in the new subworkflow version"""
+        if self.component_type == "subworkflows":
+            subworkflow_directory = Path(self.dir, self.component_type, self.modules_repo.repo_path, component)
+            included_modules, included_subworkflows = get_components_to_install(subworkflow_directory)
+            # If a new module/subworkflow is included in the subworklfow and wasn't included before
+            for module in included_modules:
+                if module not in modules_to_update:
+                    log.info(f"Installing newly included module '{module}' for '{component}'")
+                    install_module_object = ComponentInstall(self.dir, "modules", installed_by=component)
+                    install_module_object.install(module, silent=True)
+            for subworkflow in included_subworkflows:
+                if subworkflow not in subworkflows_to_update:
+                    log.info(f"Installing newly included subworkflow '{subworkflow}' for '{component}'")
+                    install_subworkflow_object = ComponentInstall(self.dir, "subworkflows", installed_by=component)
+                    install_subworkflow_object.install(subworkflow, silent=True)
+            # If a module/subworkflow has been removed from the subworkflow
+            for module in modules_to_update:
+                if module not in included_modules:
+                    log.info(f"Removing module '{module}' which is not included in '{component}' anymore.")
+                    remove_module_object = ComponentRemove("modules", self.dir)
+                    remove_module_object.remove(module, removed_by=component)
+            for subworkflow in subworkflows_to_update:
+                if subworkflow not in included_subworkflows:
+                    log.info(f"Removing subworkflow '{subworkflow}' which is not included in '{component}' anymore.")
+                    remove_subworkflow_object = ComponentRemove("subworkflows", self.dir)
+                    remove_subworkflow_object.remove(subworkflow, removed_by=component)
 
     def _change_component_type(self, new_component_type):
         original_component_type = self.component_type

@@ -26,7 +26,7 @@ from nf_core.lint_utils import run_prettier_on_file
 log = logging.getLogger(__name__)
 
 
-class PipelineCreate(object):
+class PipelineCreate:
     """Creates a nf-core pipeline a la carte from the nf-core best-practice template.
 
     Args:
@@ -38,7 +38,7 @@ class PipelineCreate(object):
         force (bool): Overwrites a given workflow directory with the same name. Defaults to False.
             May the force be with you.
         outdir (str): Path to the local output directory.
-        template_yaml (str): Path to template.yml file for pipeline creation settings.
+        template_yaml_path (str): Path to template.yml file for pipeline creation settings.
         plain (bool): If true the Git repository will be initialized plain.
         default_branch (str): Specifies the --initial-branch name.
     """
@@ -166,10 +166,16 @@ class PipelineCreate(object):
         param_dict["logo_dark"] = f"{param_dict['name_noslash']}_logo_dark.png"
         param_dict["version"] = version
 
+        config_yml = nf_core.utils.load_tools_config()
+        if (
+            "lint" in config_yml
+            and "nextflow_config" in config_yml["lint"]
+            and "manifest.name" in config_yml["lint"]["nextflow_config"]
+        ):
+            return param_dict, skip_paths
         # Check that the pipeline name matches the requirements
         if not re.match(r"^[a-z]+$", param_dict["short_name"]):
-            log.error("[red]Invalid workflow name: must be lowercase without punctuation.")
-            sys.exit(1)
+            raise UserWarning("[red]Invalid workflow name: must be lowercase without punctuation.")
 
         return param_dict, skip_paths
 
@@ -436,12 +442,12 @@ class PipelineCreate(object):
             lint_config["readme"] = ["nextflow_badge"]
 
         # Add the lint content to the preexisting nf-core config
-        nf_core_yml = nf_core.utils.load_tools_config(self.outdir)
+        config_fn, nf_core_yml = nf_core.utils.load_tools_config(self.outdir)
         nf_core_yml["lint"] = lint_config
-        with open(self.outdir / ".nf-core.yml", "w") as fh:
+        with open(self.outdir / config_fn, "w") as fh:
             yaml.dump(nf_core_yml, fh, default_flow_style=False, sort_keys=False)
 
-        run_prettier_on_file(os.path.join(self.outdir, ".nf-core.yml"))
+        run_prettier_on_file(os.path.join(self.outdir, config_fn))
 
     def make_pipeline_logo(self):
         """Fetch a logo for the new pipeline from the nf-core website"""
@@ -522,10 +528,10 @@ class PipelineCreate(object):
 
         log.info("Initialising pipeline git repository")
         repo = git.Repo.init(self.outdir)
-        if default_branch:
-            repo.active_branch.rename(default_branch)
         repo.git.add(A=True)
         repo.index.commit(f"initial template build from nf-core/tools, version {nf_core.__version__}")
+        if default_branch:
+            repo.active_branch.rename(default_branch)
         repo.git.branch("TEMPLATE")
         repo.git.branch("dev")
         log.info(

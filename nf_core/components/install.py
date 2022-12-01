@@ -10,7 +10,10 @@ from rich.syntax import Syntax
 import nf_core.modules.modules_utils
 import nf_core.utils
 from nf_core.components.components_command import ComponentCommand
-from nf_core.components.components_utils import prompt_component_version_sha
+from nf_core.components.components_utils import (
+    get_components_to_install,
+    prompt_component_version_sha,
+)
 from nf_core.modules.modules_json import ModulesJson
 from nf_core.modules.modules_repo import NF_CORE_MODULES_NAME
 
@@ -53,7 +56,8 @@ class ComponentInstall(ComponentCommand):
 
         # Verify that 'modules.json' is consistent with the installed modules and subworkflows
         modules_json = ModulesJson(self.dir)
-        modules_json.check_up_to_date()
+        if not silent:
+            modules_json.check_up_to_date()
 
         # Verify SHA
         if not self.modules_repo.verify_sha(self.prompt, self.sha):
@@ -94,11 +98,11 @@ class ComponentInstall(ComponentCommand):
         # Remove component if force is set and component is installed
         install_track = None
         if self.force:
-            log.info(f"Removing installed version of '{self.modules_repo.repo_path}/{component}'")
+            log.debug(f"Removing installed version of '{self.modules_repo.repo_path}/{component}'")
             self.clear_component_dir(component, component_dir)
             install_track = self.clean_modules_json(component, self.modules_repo, modules_json)
-
-        log.info(f"{'Rei' if self.force else 'I'}nstalling '{component}'")
+        if not silent:
+            log.info(f"{'Rei' if self.force else 'I'}nstalling '{component}'")
         log.debug(
             f"Installing {self.component_type} '{component}' at modules hash {version} from {self.modules_repo.remote_url}"
         )
@@ -123,14 +127,14 @@ class ComponentInstall(ComponentCommand):
             log.info(f"Use the following statement to include this {self.component_type[:-1]}:")
             Console().print(
                 Syntax(
-                    f"include {{ {component_name} }} from '.{os.path.join(install_folder, component)}/main'",
+                    f"include {{ {component_name} }} from '../{Path(install_folder, component).relative_to(self.dir)}/main'",
                     "groovy",
                     theme="ansi_dark",
                     padding=1,
                 )
             )
             if self.component_type == "subworkflows":
-                subworkflow_config = os.path.join(install_folder, component, "nextflow.config")
+                subworkflow_config = Path(install_folder, component, "nextflow.config").relative_to(self.dir)
                 if os.path.isfile(subworkflow_config):
                     log.info("Add the following config statement to use this subworkflow:")
                     Console().print(
@@ -138,32 +142,11 @@ class ComponentInstall(ComponentCommand):
                     )
         return True
 
-    def get_modules_subworkflows_to_install(self, subworkflow_dir):
-        """
-        Parse the subworkflow test main.nf file to retrieve all imported modules and subworkflows.
-        """
-        modules = []
-        subworkflows = []
-        with open(Path(subworkflow_dir, "main.nf"), "r") as fh:
-            for line in fh:
-                regex = re.compile(
-                    r"include(?: *{ *)([a-zA-Z\_0-9]*)(?: *as *)?(?:[a-zA-Z\_0-9]*)?(?: *})(?: *from *)(?:'|\")(.*)(?:'|\")"
-                )
-                match = regex.match(line)
-                if match and len(match.groups()) == 2:
-                    name, link = match.groups()
-                    if link.startswith("../../../"):
-                        name_split = name.lower().split("_")
-                        modules.append("/".join(name_split))
-                    elif link.startswith("../"):
-                        subworkflows.append(name.lower())
-        return modules, subworkflows
-
     def install_included_components(self, subworkflow_dir):
         """
         Install included modules and subworkflows
         """
-        modules_to_install, subworkflows_to_install = self.get_modules_subworkflows_to_install(subworkflow_dir)
+        modules_to_install, subworkflows_to_install = get_components_to_install(subworkflow_dir)
         for s_install in subworkflows_to_install:
             original_installed = self.installed_by
             self.installed_by = Path(subworkflow_dir).parts[-1]
@@ -186,7 +169,7 @@ class ComponentInstall(ComponentCommand):
         if component is None:
             component = questionary.autocomplete(
                 f"{'Tool' if self.component_type == 'modules' else 'Subworkflow'} name:",
-                choices=modules_repo.get_avail_components(self.component_type),
+                choices=sorted(modules_repo.get_avail_components(self.component_type)),
                 style=nf_core.utils.nfcore_question_style,
             ).unsafe_ask()
 
@@ -214,8 +197,11 @@ class ComponentInstall(ComponentCommand):
             False: if the component is installed
         """
         if (current_version is not None and os.path.exists(component_dir)) and not force:
+            # make sure included components are also installed
+            if self.component_type == "subworkflows":
+                self.install_included_components(component_dir)
             if not silent:
-                log.info(f"{self.component_type[:-1].title()} is already installed.")
+                log.info(f"{self.component_type[:-1].title()} '{component}' is already installed.")
 
             if prompt:
                 message = (
@@ -235,7 +221,7 @@ class ComponentInstall(ComponentCommand):
                     branch_flag = "" if modules_repo.branch == "master" else f"-b {modules_repo.branch} "
 
                     log.info(
-                        f"To update '{component}' run 'nf-core {self.component_type} {repo_flag}{branch_flag}update {component}'. To force reinstallation use '--force'"
+                        f"To update '{component}' run 'nf-core {self.component_type} {repo_flag}{branch_flag}update {component}'. To force reinstallation use '--force'."
                     )
                 return False
 
@@ -272,8 +258,8 @@ class ComponentInstall(ComponentCommand):
                 for name, component_values in dir_components.items():
                     if name == component and dir == modules_repo.repo_path:
                         repo_to_remove = repo_url
-                        log.info(
-                            f"Removing {self.component_type[:-1]} '{modules_repo.repo_path}/{component}' from repo '{repo_to_remove}' from modules.json"
+                        log.debug(
+                            f"Removing {self.component_type[:-1]} '{modules_repo.repo_path}/{component}' from repo '{repo_to_remove}' from modules.json."
                         )
                         modules_json.remove_entry(
                             self.component_type, component, repo_to_remove, modules_repo.repo_path

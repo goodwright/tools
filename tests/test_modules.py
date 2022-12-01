@@ -32,7 +32,7 @@ def create_modules_repo_dummy(tmp_dir):
     with open(os.path.join(root_dir, "tests", "config", "pytest_modules.yml"), "w") as fh:
         fh.writelines(["test:", "\n  - modules/test/**", "\n  - tests/modules/test/**"])
     with open(os.path.join(root_dir, ".nf-core.yml"), "w") as fh:
-        fh.writelines(["repository_type: modules", "\n"])
+        fh.writelines(["repository_type: modules", "\n", "org_path: nf-core", "\n"])
 
     # mock biocontainers and anaconda response
     with requests_mock.Mocker() as mock:
@@ -95,7 +95,11 @@ class TestModules(unittest.TestCase):
 
         # Set up remove objects
         self.mods_remove = nf_core.modules.ModuleRemove(self.pipeline_dir)
-        self.mods_remove_alt = nf_core.modules.ModuleRemove(self.pipeline_dir)
+        self.mods_remove_gitlab = nf_core.modules.ModuleRemove(
+            self.pipeline_dir,
+            remote_url=GITLAB_URL,
+            branch=GITLAB_DEFAULT_BRANCH,
+        )
 
         # Set up the nf-core/modules repo dummy
         self.nfcore_modules = create_modules_repo_dummy(self.tmp_dir)
@@ -195,6 +199,7 @@ class TestModules(unittest.TestCase):
         test_create_patch_update_success,
     )
     from .modules.remove import (
+        test_modules_remove_multiqc_from_gitlab,
         test_modules_remove_trimgalore,
         test_modules_remove_trimgalore_uninstalled,
     )

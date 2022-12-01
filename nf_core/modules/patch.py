@@ -25,7 +25,7 @@ class ModulePatch(ComponentCommand):
         if not self.has_valid_directory():
             raise UserWarning()
 
-        modules = self.modules_json.get_all_modules()[self.modules_repo.remote_url]
+        modules = self.modules_json.get_all_components(self.component_type)[self.modules_repo.remote_url]
         module_names = [module for _, module in modules]
 
         if module is not None and module not in module_names:
@@ -38,10 +38,13 @@ class ModulePatch(ComponentCommand):
 
         self.modules_json.check_up_to_date()
         self.param_check(module)
-        modules = self.modules_json.get_all_modules()[self.modules_repo.remote_url]
+        modules = self.modules_json.get_all_components(self.component_type)[self.modules_repo.remote_url]
 
         if module is None:
-            choices = [module if dir == "nf-core" else f"{dir}/{module}" for dir, module in modules]
+            choices = [
+                module if directory == self.modules_repo.repo_path else f"{directory}/{module}"
+                for directory, module in modules
+            ]
             module = questionary.autocomplete(
                 "Tool:",
                 choices,

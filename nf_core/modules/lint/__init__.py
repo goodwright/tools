@@ -35,7 +35,7 @@ class ModuleLintException(Exception):
     pass
 
 
-class LintResult(object):
+class LintResult:
     """An object to hold the results of a lint test"""
 
     def __init__(self, mod, lint_test, message, file_path):
@@ -89,9 +89,9 @@ class ModuleLint(ComponentCommand):
         if self.repo_type == "pipeline":
             modules_json = ModulesJson(self.dir)
             modules_json.check_up_to_date()
-            all_pipeline_modules = modules_json.get_all_modules()
-            if self.modules_repo.remote_url in all_pipeline_modules:
-                module_dir = Path(self.dir, "modules", "nf-core")
+            all_pipeline_modules = modules_json.get_all_components(self.component_type)
+            if all_pipeline_modules is not None and self.modules_repo.remote_url in all_pipeline_modules:
+                module_dir = Path(self.dir, "modules", self.modules_repo.repo_path)
                 self.all_remote_modules = [
                     NFCoreModule(m[1], self.modules_repo.remote_url, module_dir / m[1], self.repo_type, Path(self.dir))
                     for m in all_pipeline_modules[self.modules_repo.remote_url]

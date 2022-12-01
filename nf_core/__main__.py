@@ -58,7 +58,7 @@ click.rich_click.COMMAND_GROUPS = {
     "nf-core subworkflows": [
         {
             "name": "For pipelines",
-            "commands": ["list", "info", "install", "update"],
+            "commands": ["info", "install", "list", "remove", "update"],
         },
         {
             "name": "Developing new subworkflows",
@@ -79,27 +79,28 @@ rich.traceback.install(console=stderr, width=200, word_wrap=True, extra_lines=1)
 
 
 def run_nf_core():
-    # Print nf-core header
-    stderr.print(f"\n[green]{' ' * 42},--.[grey39]/[green],-.", highlight=False)
-    stderr.print("[blue]          ___     __   __   __   ___     [green]/,-._.--~\\", highlight=False)
-    stderr.print(r"[blue]    |\ | |__  __ /  ` /  \ |__) |__      [yellow]   }  {", highlight=False)
-    stderr.print(r"[blue]    | \| |       \__, \__/ |  \ |___     [green]\`-._,-`-,", highlight=False)
-    stderr.print("[green]                                          `._,._,'\n", highlight=False)
-    stderr.print(
-        f"[grey39]    nf-core/tools version {nf_core.__version__} - [link=https://nf-co.re]https://nf-co.re[/]",
-        highlight=False,
-    )
-    try:
-        is_outdated, _, remote_vers = nf_core.utils.check_if_outdated()
-        if is_outdated:
-            stderr.print(
-                f"[bold bright_yellow]    There is a new version of nf-core/tools available! ({remote_vers})",
-                highlight=False,
-            )
-    except Exception as e:
-        log.debug(f"Could not check latest version: {e}")
-    stderr.print("\n")
-
+    # print nf-core header if environment variable is not set
+    if os.environ.get("_NF_CORE_COMPLETE") is None:
+        # Print nf-core header
+        stderr.print(f"\n[green]{' ' * 42},--.[grey39]/[green],-.", highlight=False)
+        stderr.print("[blue]          ___     __   __   __   ___     [green]/,-._.--~\\", highlight=False)
+        stderr.print(r"[blue]    |\ | |__  __ /  ` /  \ |__) |__      [yellow]   }  {", highlight=False)
+        stderr.print(r"[blue]    | \| |       \__, \__/ |  \ |___     [green]\`-._,-`-,", highlight=False)
+        stderr.print("[green]                                          `._,._,'\n", highlight=False)
+        stderr.print(
+            f"[grey39]    nf-core/tools version {nf_core.__version__} - [link=https://nf-co.re]https://nf-co.re[/]",
+            highlight=False,
+        )
+        try:
+            is_outdated, _, remote_vers = nf_core.utils.check_if_outdated()
+            if is_outdated:
+                stderr.print(
+                    f"[bold bright_yellow]    There is a new version of nf-core/tools available! ({remote_vers})",
+                    highlight=False,
+                )
+        except Exception as e:
+            log.debug(f"Could not check latest version: {e}")
+        stderr.print("\n")
     # Launch the click cli
     nf_core_cli(auto_envvar_prefix="NFCORE")
 
@@ -1058,6 +1059,26 @@ def info(ctx, tool, dir):
         sys.exit(1)
 
 
+# nf-core subworkflows test
+@subworkflows.command("test")
+@click.pass_context
+@click.argument("subworkflow", type=str, required=False, metavar="subworkflow name")
+@click.option("-p", "--no-prompts", is_flag=True, default=False, help="Use defaults without prompting")
+@click.option("-a", "--pytest_args", type=str, required=False, multiple=True, help="Additional pytest arguments")
+def test_subworkflow(ctx, subworkflow, no_prompts, pytest_args):
+    """
+    Run subworkflow tests locally.
+
+    Given the name of a subworkflow, runs the Nextflow test command.
+    """
+    try:
+        meta_builder = nf_core.subworkflows.SubworkflowsTest(subworkflow, no_prompts, pytest_args)
+        meta_builder.run()
+    except (UserWarning, LookupError) as e:
+        log.critical(e)
+        sys.exit(1)
+
+
 # nf-core subworkflows install
 @subworkflows.command()
 @click.pass_context
@@ -1160,6 +1181,34 @@ def local(ctx, keywords, json, dir):  # pylint: disable=redefined-builtin
         stdout.print(subworkflow_list.list_components(keywords, json))
     except (UserWarning, LookupError) as e:
         log.error(e)
+        sys.exit(1)
+
+
+# nf-core subworkflows remove
+@subworkflows.command()
+@click.pass_context
+@click.argument("subworkflow", type=str, required=False, metavar="subworkflow name")
+@click.option(
+    "-d",
+    "--dir",
+    type=click.Path(exists=True),
+    default=".",
+    help=r"Pipeline directory. [dim]\[default: current working directory][/]",
+)
+def remove(ctx, dir, subworkflow):
+    """
+    Remove a subworkflow from a pipeline.
+    """
+    try:
+        module_remove = nf_core.subworkflows.SubworkflowRemove(
+            dir,
+            ctx.obj["modules_repo_url"],
+            ctx.obj["modules_repo_branch"],
+            ctx.obj["modules_repo_no_pull"],
+        )
+        module_remove.remove(subworkflow)
+    except (UserWarning, LookupError) as e:
+        log.critical(e)
         sys.exit(1)
 
 
