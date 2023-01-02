@@ -34,9 +34,9 @@ class ComponentRemove(ComponentCommand):
         Returns:
             bool: True if any item has been removed, False if not
         """
-        if self.repo_type == "modules":
-            log.error(f"You cannot remove a {self.component_type[:-1]} in a clone of nf-core/modules")
-            return False
+        # if self.repo_type == "modules":
+        #     log.error(f"You cannot remove a {self.component_type[:-1]} in a clone of nf-core/modules")
+        #     return False
 
         # Check modules directory structure
         if self.component_type == "modules":

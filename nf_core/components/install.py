@@ -43,9 +43,9 @@ class ComponentInstall(ComponentCommand):
             self.installed_by = self.component_type
 
     def install(self, component, silent=False):
-        if self.repo_type == "modules":
-            log.error(f"You cannot install a {component} in a clone of nf-core/modules")
-            return False
+        # if self.repo_type == "modules":
+        #     log.error(f"You cannot install a {component} in a clone of nf-core/modules")
+        #     return False
         # Check whether pipelines is valid
         if not self.has_valid_directory():
             return False
