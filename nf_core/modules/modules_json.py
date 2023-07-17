@@ -601,8 +601,9 @@ class ModulesJson:
         subworkflows_dict = self.get_all_components("subworkflows")
         if subworkflows_dict:
             for repo, subworkflows in subworkflows_dict.items():
-                for org, subworkflow in subworkflows:
-                    self.recreate_dependencies(repo, org, subworkflow)
+                if repo != "https://github.com/goodwright/flow-nf.git":
+                    for org, subworkflow in subworkflows:
+                        self.recreate_dependencies(repo, org, subworkflow)
         self.pipeline_components = original_pipeline_components
 
         self.dump()
